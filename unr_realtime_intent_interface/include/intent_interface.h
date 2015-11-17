@@ -18,19 +18,19 @@ typedef struct JPLMsgOut {
   float     group_confidence;
 } JPLMsgOut_t;
 
-// class JPLInterface {
-//  public:
-//   JPLInterface();
-//   JPLInterface(ifstream *fin);
-//   JPLInterface(AF_INET address, uint32_t port);
+class JPLInterface {
+ public:
+  JPLInterface();
+  JPLInterface(std::ofstream *fout);
+  JPLInterface(uint32_t address, uint32_t port);
 
-//   virtual ~JPLInterface();
+  virtual ~JPLInterface();
 
-//   uint32_t Start();
-//   void WaitForDone();
+  uint32_t Start();
+  void WaitForDone();
 
-//  private:
-//   std::thread *main_thread;
-// };
+ private:
+  std::thread *main_thread;
+};
 }
 #endif  // INTENT_INTERFACE_H_

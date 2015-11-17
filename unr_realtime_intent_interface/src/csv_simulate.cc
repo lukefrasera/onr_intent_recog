@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
   if (filename)
     LOG_INFO("Filename: %s", filename);
   // Initialize file stream
-  std::ifstream fin;
+  std::ofstream fin;
   fin.open(filename);
 
   // Initilialize simulation
