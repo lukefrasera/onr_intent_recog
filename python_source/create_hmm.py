@@ -156,21 +156,67 @@ def getAcceleration(feature):
 # Train HMM
 def train(inputFileName, outputFileName, numStates):
 
+    # Initialize variables
+    collapsedObservations = dict()
     allPossibleSymbols = []
-    observedSymbols = readInputFile(inputFileName)
 
     # List of all possible discrete observations
-    for d in [relative_angle,delta_location,delta_speed,delta_angle]:
-        for k, v in d.iteritems():
-            allPossibleSymbols.append(v)
+    counter = 0
+    for k1, v1 in relative_angle.iteritems():
+        for k2, v2 in delta_location.iteritems():
+            for k3, v3 in delta_speed.iteritems():
+                for k4, v4 in delta_angle.iteritems():
+                    counter += 1
+                    collapsedObservations[str(v1)+str(v2)+str(v3)+str(v4)] = counter
+
+                    # debug: print out mapping from observation tuple to unique integer
+                    print (k1 + ' ' + k2 + ' ' + k3 + ' ' + k4), '==', counter
+    
+    for k, v in collapsedObservations.iteritems():
+        allPossibleSymbols.append(v)
+
+    # More iterations here
+    observed_fixed = []
+    observedSymbols = readInputFile(inputFileName)
+
+    # Convert list of symbols to unique interger identifier
+    for s in observedSymbols:
+        observed_fixed.append(collapsedObservations[str(s[0])+str(s[1])+str(s[2])+str(s[3])])
+    
+
+    # Try the method in classify.py
+    dataLen = 5
+    split = []
+
+    #'''
+    # bin in groups of dataLen
+    for i in range(0, len(observed_fixed), dataLen):
+
+        if i + dataLen > len(observed_fixed):
+            split.append(observed_fixed[i:-1])
+        else:
+            split.append(observed_fixed[i:i+dataLen])
+        
+        #debug: print training data split into dataLen pieces
+        print split[-1]
+    #'''  
+
+    '''
+    for i in range(dataLen, len(observed_fixed)):
+        split.append(observed_fixed[(i - dataLen): i])
+
+        # debug: print training data split into dataLen pieces
+        print split[-1]
+    '''
+
+    print allPossibleSymbols 
 
     HMM = hmm.HMM(numStates, V=allPossibleSymbols)
-    HMM = hmm.baum_welch(HMM, observedSymbols)
+    HMM = hmm.baum_welch(HMM, split)
     print HMM
 
-    log_Prob_Obs, Alpha, c = hmm.forward(HMM, [00,10,20,30])
+    log_Prob_Obs, Alpha, c = hmm.forward(HMM, [28, 28, 28, 28, 28])
     print math.exp(log_Prob_Obs)
-
 
 # Test HMM
 def test(inputFileName, inHmmName):
