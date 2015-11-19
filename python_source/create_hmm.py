@@ -1,7 +1,9 @@
 import sys
+import os
 import math
 import argparse
 import csv
+import pickle
 import hmm
 
 # Symbol Definitions
@@ -29,16 +31,43 @@ otherBoat_ay      = 13
 otherBoat_theta   = 14
 otherBoat_dTheta  = 15
 
+timeStamp         = 16
+
 # Thresholds
 relativeAngleThresh = (math.pi / 12)
 distanceThresh = 1.0
 accelThresh = 0.1
 deltaAngleThresh = 0.01
 
+# Other controls
+dataLen = 20
+
 # Kill program with error message
 def killProgramWithMessage(errorMSG):
     print errorMSG
     sys.exit(2)
+
+# Get list of files under directory
+def getFilesFromDir(topLevelDir):
+
+    fileList = []
+
+    # In case the input dir as a tailing '/' on it
+    if topLevelDir[-1] != '/':
+        topLevelDir = topLevelDir + '/'
+
+    # Get a list of all the subdirectories
+    subDirs = [name for name in os.listdir(topLevelDir) if os.path.isdir(os.path.join(topLevelDir, name))]
+
+    # Get all training files in those subdirectories
+    for subDir in subDirs:
+        expectedFile = topLevelDir + subDir +'/hmm_formatted.csv'
+
+        if os.path.isfile(expectedFile):
+            fileList.append(expectedFile)
+
+    # Return list of all training files
+    return fileList 
 
 # Read in inputFeatures
 def readInputFile(inputFileName):
@@ -50,7 +79,7 @@ def readInputFile(inputFileName):
            inputFeatures.append(row)
 
     inputFeatures = [map(float,x) for x in inputFeatures]
-    return computeSymbols(inputFeatures)
+    return computeSymbols(inputFeatures), inputFeatures
 
 # Compute Symbols from Features
 def computeSymbols(inputFeatures):
@@ -153,14 +182,10 @@ def getAcceleration(feature):
 
     return math.sqrt(x_accel * x_accel + y_accel * y_accel)
 
-# Train HMM
-def train(inputFileName, outputFileName, numStates):
+def collapseObservations():
 
-    # Initialize variables
     collapsedObservations = dict()
-    allPossibleSymbols = []
 
-    # List of all possible discrete observations
     counter = 0
     for k1, v1 in relative_angle.iteritems():
         for k2, v2 in delta_location.iteritems():
@@ -169,78 +194,163 @@ def train(inputFileName, outputFileName, numStates):
                     counter += 1
                     collapsedObservations[str(v1)+str(v2)+str(v3)+str(v4)] = counter
 
-                    # debug: print out mapping from observation tuple to unique integer
-                    print (k1 + ' ' + k2 + ' ' + k3 + ' ' + k4), '==', counter
-    
+    return collapsedObservations
+
+# Train HMM
+def train(inputFileDir, outputFileName, numStates):
+
+    # Initialize variables
+    collapsedObservations = dict()
+    allPossibleSymbols = []
+
+    # List of all possible discrete observations
+    collapsedObservations = collapseObservations()
+
     for k, v in collapsedObservations.iteritems():
         allPossibleSymbols.append(v)
 
-    # More iterations here
-    observed_fixed = []
-    observedSymbols = readInputFile(inputFileName)
+    # Initialize HMM
+    HMM = hmm.HMM(numStates, V=allPossibleSymbols)
 
-    # Convert list of symbols to unique interger identifier
-    for s in observedSymbols:
-        observed_fixed.append(collapsedObservations[str(s[0])+str(s[1])+str(s[2])+str(s[3])])
-    
+    # Get file names from training directory
+    filenames = getFilesFromDir(inputFileDir)
 
-    # Try the method in classify.py
-    dataLen = 5
+    # iterate over all of our training files
+    for f in filenames:
+
+        # More iterations here
+        observed_fixed = []
+        observedSymbols, features = readInputFile(f)
+
+        # Convert list of symbols to unique interger identifier
+        for s in observedSymbols:
+            observed_fixed.append(collapsedObservations[str(s[0])+str(s[1])+str(s[2])+str(s[3])])
+
+        # Bin data
+        split = binData(observed_fixed)
+
+        # Update HMM
+        HMM = hmm.baum_welch(HMM, split, epochs=20)
+
+        break
+
+    # Save HMM to disk
+    saveHmm(outputFileName, HMM) 
+
+def binData(observed_symbols):
+
+    # Initialize Variables
     split = []
 
-    #'''
-    # bin in groups of dataLen
-    for i in range(0, len(observed_fixed), dataLen):
+    # Bin data in "Rolling Window" method
+    for i in range(dataLen, len(observed_symbols)):
+        split.append(observed_symbols[(i - dataLen): i])
 
-        if i + dataLen > len(observed_fixed):
-            split.append(observed_fixed[i:-1])
-        else:
-            split.append(observed_fixed[i:i+dataLen])
-        
-        #debug: print training data split into dataLen pieces
-        print split[-1]
-    #'''  
+    return split
 
-    '''
-    for i in range(dataLen, len(observed_fixed)):
-        split.append(observed_fixed[(i - dataLen): i])
+def saveHmm(outputFileName, hmm) :
+    with open(outputFileName, 'w+') as f:
+        pickle.dump(hmm,f)
 
-        # debug: print training data split into dataLen pieces
-        print split[-1]
-    '''
-
-    print allPossibleSymbols 
-
-    HMM = hmm.HMM(numStates, V=allPossibleSymbols)
-    HMM = hmm.baum_welch(HMM, split)
-    print HMM
-
-    log_Prob_Obs, Alpha, c = hmm.forward(HMM, [28, 28, 28, 28, 28])
-    print math.exp(log_Prob_Obs)
+def loadHmm(inputFileName):
+    hmm = None
+    with open(inputFileName) as f:
+        hmm = pickle.load(f)
+    return hmm
 
 # Test HMM
-def test(inputFileName, inHmmName):
-    pass
+def test(inputFileDir, inHmmName):
+
+    # Load HMM data from file
+    HMM = loadHmm(inHmmName)
+
+    # Get file names from training directory
+    filenames = getFilesFromDir(inputFileDir)
+
+    # List of all possible discrete observations
+    collapsedObservations = collapseObservations()
+
+    # iterate over all of our training files
+    for f in filenames:
+
+        # Initialize Variables
+        probs = []
+        
+        # More iterations here
+        observed_fixed = []
+        observedSymbols, features = readInputFile(f)
+
+        # Convert list of symbols to unique interger identifier
+        for s in observedSymbols:
+            observed_fixed.append(collapsedObservations[str(s[0])+str(s[1])+str(s[2])+str(s[3])])
+
+        # Bin data
+        split = binData(observed_fixed)
+
+        # Generate test data
+        for line in split:
+            logProb, _, _ = hmm.forward(HMM, line)
+            probs.append(math.exp(logProb))
+
+        # Save to file:
+        createOutputReport(f, probs, features)
+
+def createOutputReport(filename, probs, symbols):
+
+    # Initialize Variables
+    header = "timestamp, source_id, contact_id, contact_type, intent_type, group_id, intent_class, intent_prob, group_confidence\n"
+    index = dataLen
+    
+    # Get save location
+    parentDir =  os.path.dirname(filename)
+
+    # Begin writting report
+    with open(parentDir + '/probability_report.csv', 'w+') as f:
+
+        f.write(header)
+
+        for p in probs:
+
+            # Timestamp
+            f.write(str(symbols[index][timeStamp]) + ',')
+            
+            # Some constants
+            f.write("1,4,99,1,1,1,") 
+
+            # Probability
+            f.write(str(p) + ',')
+            
+            # More constants
+            f.write("1\n")
+
+            # Increase index
+            index += 1
 
 # Main
 if __name__ == '__main__':
 
     # Parse input arguments
     parser = argparse.ArgumentParser(description='Test or train HMM')
-    parser.add_argument('input_file', help='The .csv input file for training/testing data')
+    parser.add_argument('input_file_dir', help='The .csv input file directory for training/testing data')
     parser.add_argument('mode', help='Either "train" or "test"')
     parser.add_argument('hmm', help='Name of HMM to be trained or tested')
     parser.add_argument('--numStates', help='The desired number of hidden states')
     args = parser.parse_args()
 
+    # Test with input files, and produce output hmm
     if args.mode == 'train':
         numStates = 2 
 
         if args.numStates and args.numStates in rang(2,6):
             numStates = int(numStates)
 
-        train(args.input_file, args.hmm, numStates) 
+        train(args.input_file_dir, args.hmm, numStates) 
+
+    # Train with input files, and product output probabilities
     elif args.mode == 'test':
-        test(args.input_file, args.hmm) 
+        test(args.input_file_dir, args.hmm) 
+
+    # Something has gone wrong
     else:
         killProgramWithMessage('Argument Error: Invalid Mode')
+
