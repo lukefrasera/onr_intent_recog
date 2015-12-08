@@ -1,0 +1,82 @@
+package intent_recog;
+
+
+message OwnShip {
+  message Position {
+    required float x = 1;
+    required float y = 2;
+    required float z = 3;
+  }
+  message Velocity {
+    required float x = 1;
+    required float y = 2;
+  }
+  enum NavState {
+    STRAIGHT  = 0;
+    STARBOARD = 1;
+    PORT      = 2;
+  }
+  enum SubContact {
+    DETECTED = 1;
+    NOT_DETECTED = 0;
+    ON_WATER = -999;
+  }
+  
+  required Position pos = 1;
+  required Velocity vel = 2;
+  required float theta = 3;
+  required NavState state = 4;
+  required SubContact sub_contact_bool = 5;
+  required uint32 N = 6;
+}
+
+message MoverShip {
+  message Position {
+    required float x = 1;
+    required float y = 2;
+    required float z = 3;
+  }
+  message Velocity {
+    required float x = 1;
+    required float y = 2;
+  }
+  enum NavState {
+    STRAIGHT  = 0;
+    STARBOARD = 1;
+    PORT      = 2;
+  }
+  enum Type {
+    BOAT_NEUTRAL = 0;
+    BOAT_FRIENDLY = 1;
+    BOAT_HOSTILE = 2;
+    SUB_TARGET = 3;
+    BOAT_SAILING = 4;
+    BOAT_360 = 5;
+    BOAT_OLCD_STEREO = 6;
+    BOAT_MEMORY = 7;
+    BOAT_HOSTILE_HERDING = 8;
+    BOAT_HOSTILE_BLOCKING = 9;
+    BOAT_HOSTILE_RAMMING = 10;
+  }
+
+  required Position pos = 1;
+  required Velocity vel = 2;
+  required float theta = 3;
+  required NavState state = 4;
+  required float range = 5;
+  required float bearing = 6;
+  required float lat_sep = 7;
+  required float cpa_dist = 8;
+  required float cpa_time = 9;
+  required bool collision_bool = 10;
+  required bool boundary_violated = 11;
+  required Type intent = 12;
+}
+
+
+message WorldState {
+  required double t = 1;
+  optional uint32 frame = 2;
+  required OwnShip ownship = 3;
+  repeated MoverShip movers = 4;
+}
