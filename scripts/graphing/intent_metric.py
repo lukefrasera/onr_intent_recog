@@ -57,31 +57,31 @@ def main():
             fig.text(0.03, 0.5, 'Probability', ha='center', va='center', rotation='vertical', fontsize=14, fontweight='bold')
             plt.subplots_adjust(hspace=.2, left=.06, top=.90, right=0.97, bottom=0.07)
 
-            g1 = plt.subplot(411)
-            plt.plot(block_data[:,0], block_data[:,7], label='Block', color='blue', linewidth=2.0)
-            plt.plot(ram_data[:,0], ram_data[:,7], label='Ram', color='red', linewidth=2.0)
-            plt.plot(herd_data[:,0], herd_data[:,7], label='Herd', color='green', linewidth=2.0)
-            plt.title('Overlayed Predictions')
-            plt.ylim([-0.01,1.01])
-            plt.legend(loc='upper right')
-            plt.setp(g1.get_xticklabels(), visible=False)
-            plt.gca().xaxis.set_major_formatter(formatter)
+            # g1 = plt.subplot(411)
+            # plt.plot(block_data[:,0], block_data[:,7], label='Block', color='blue', linewidth=2.0)
+            # plt.plot(ram_data[:,0], ram_data[:,7], label='Ram', color='red', linewidth=2.0)
+            # plt.plot(herd_data[:,0], herd_data[:,7], label='Herd', color='green', linewidth=2.0)
+            # plt.title('Overlayed Predictions')
+            # plt.ylim([-0.01,1.01])
+            # plt.legend(loc='upper right')
+            # plt.setp(g1.get_xticklabels(), visible=False)
+            # plt.gca().xaxis.set_major_formatter(formatter)
 
-            g2 = plt.subplot(412)
+            g2 = plt.subplot(311)
             plt.plot(block_data[:,0], block_data[:,7], color='blue', linewidth=2.0)
             plt.title('Block Prediction')
             plt.ylim([-0.01,1.01])
             plt.setp(g2.get_xticklabels(), visible=False)
             plt.gca().xaxis.set_major_formatter(formatter)
 
-            g3 = plt.subplot(413)
+            g3 = plt.subplot(312)
             plt.plot(ram_data[:,0], ram_data[:,7], color='red', linewidth=2.0)
             plt.title('Ram Prediction')
             plt.ylim([-0.01,1.01])
             plt.setp(g3.get_xticklabels(), visible=False)
             plt.gca().xaxis.set_major_formatter(formatter)
 
-            g4 = plt.subplot(414)
+            g4 = plt.subplot(313)
             plt.plot(herd_data[:,0], herd_data[:,7], color='green', linewidth=2.0)
             plt.title('Herd Prediction')
             plt.ylim([-0.01,1.01])
@@ -97,13 +97,13 @@ def main():
 
             # Determine Correct prediction
             if 'block' in file.lower():
-                print "Block Type"
+                # print "Block Type"
                 class_type = 5
             elif 'ram' in file.lower():
-                print "Ram Type"
+                # print "Ram Type"
                 class_type = 1
             elif 'herd' in file.lower():
-                print "Herd Type"
+                # print "Herd Type"
                 class_type = 7
             else:
                 print "Error: Type not detected"
