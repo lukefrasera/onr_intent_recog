@@ -28,15 +28,20 @@ def main():
     if os.path.isfile(args.dir):
         print "Error: Expected Directory not File"
         return -1
+
+    accuracy_list = []
+    early_predict_list = []
+    changes_list = []
+    filename_list = []
     for dirname, subdirlist, fileList, in os.walk(args.dir):
         if 'probability_report.csv' in fileList:
             filename = os.path.join(dirname, 'probability_report.csv')
             print "Processing: %s"%(filename)
             # graph predictions
             data = np.genfromtxt(filename, delimiter=',')[1:]
-            block_data = data[data[:,4] == 5]
-            ram_data   = data[data[:,4] == 1]
-            herd_data  = data[data[:,4] == 7]
+            block_data = data[data[:,6] == 5]
+            ram_data   = data[data[:,6] == 1]
+            herd_data  = data[data[:,6] == 7]
             '''
             plot a 4 sublpot graph with one combined graph and 3 of the individual
             probabilities to understand meaning easier
@@ -44,6 +49,7 @@ def main():
             fig = plt.figure(1,figsize=(16, 9), dpi=72)
 
             file = os.path.basename(os.path.dirname(filename))
+            filename_list.append(file)
             fig.suptitle("%s"%(file), fontsize=22)
             formatter = mpl.ticker.FuncFormatter(lambda x, p: scientificNotation(x))
             fig.text(0.5, 0.03, 'Time', ha='center', va='center', fontsize=14, fontweight='bold')
@@ -54,7 +60,7 @@ def main():
             plt.plot(block_data[:,0], block_data[:,7], label='Block', color='blue', linewidth=2.0)
             plt.plot(ram_data[:,0], ram_data[:,7], label='Ram', color='red', linewidth=2.0)
             plt.plot(herd_data[:,0], herd_data[:,7], label='Herd', color='green', linewidth=2.0)
-            plt.title('Combined Prediction')
+            plt.title('Overlayed Predictions')
             plt.ylim([0,1])
             plt.legend(loc='upper right')
             plt.setp(g1.get_xticklabels(), visible=False)
@@ -86,6 +92,123 @@ def main():
             if args.verbose:
                 plt.show()
             fig.clear()
+            # Generate Timeline predictions
+
+            # Determine Correct prediction
+            if 'block' in file.lower():
+                print "Block Type"
+                class_type = 5
+            elif 'ram' in file.lower():
+                print "Ram Type"
+                class_type = 1
+            elif 'herd' in file.lower():
+                print "Herd Type"
+                class_type = 7
+            else:
+                print "Error: Type not detected"
+            prediction = []
+
+            for i in xrange(len(block_data)):
+                m = max(block_data[i, 7], ram_data[i, 7], herd_data[i,7])
+                if m == block_data[i, 7]:
+                    prediction.append(block_data[i])
+                elif m == ram_data[i, 7]:
+                    prediction.append(ram_data[i])
+                elif m == herd_data[i, 7]:
+                    prediction.append(herd_data[i])
+            prediction = np.array(prediction)
+            # Compute Accuracy
+            # block_num = len([prediction[i] for i in xrange(len(prediction)) if prediction[i,4] == 5])
+            # ram_num = len([prediction[i] for i in xrange(len(prediction)) if prediction[i,4] == 1])
+            # herd_num = len([prediction[i] for i in xrange(len(prediction)) if prediction[i,4] == 7])
+            num_correct = len([prediction[i] for i in xrange(len(prediction)) if prediction[i,6] == class_type])
+            num_predict = len(prediction)
+            accuracy = float(num_correct) / float(num_predict)
+            accuracy_list.append(accuracy)
+
+            # Compute confusion matrix
+            ground_truth = [class_type for i in xrange(len(prediction))]
+            class_types = [1,5,7]
+
+            confusion_mat = np.zeros([3,3])
+            for i, correct_index in enumerate(class_types):
+                for j, predicted_index in enumerate(class_types):
+                    for k in xrange(len(prediction)):
+                        if prediction[k,6] == predicted_index and ground_truth[k] == correct_index:
+                            confusion_mat[i, j] += 1.0
+            for i, row in enumerate(confusion_mat):
+                confusion_mat[i] = row / sum(row, 1)
+
+            fig_conf = plt.figure(2)
+
+            ax = fig_conf.add_subplot(111)
+            ax.set_aspect(1)
+            rows = len(confusion_mat)
+            cols = len(confusion_mat[0])
+            res = ax.imshow(confusion_mat, cmap=plt.cm.jet, interpolation='nearest')
+
+            for x in xrange(cols):
+                for y in xrange(rows):
+                    ax.annotate(str(confusion_mat[y,x]), xy=(x,y),horizontalalignment='center',verticalalignment='center')
+
+            cb = fig_conf.colorbar(res)
+            class_list = ['RAM', 'BLOCK', 'HERD']
+            plt.xticks(range(len(class_list)), class_list)
+            plt.yticks(range(len(class_list)), class_list)
+            plt.ylabel('True label')
+            plt.xlabel('Predicted label')
+            plt.title('%s Confusion Matrix'%(file))
+            plt.savefig(file + '_confusion.pdf')
+            if args.verbose:
+                plt.show()
+            fig_conf.clear()
+
+            # Compute Early Detection Rate
+            early_predict = 1
+            for i in reversed(xrange(len(prediction))):
+                if prediction[i,6] != class_type:
+                    early_predict = float(len(prediction) - (i+1)) / float(num_predict)
+                    break
+            early_predict_list.append(early_predict)
+            # compute Persistance of Recognized intent
+            changes = -1
+            previous_state = -1
+            for row in prediction:
+                if previous_state != row[6]:
+                    changes += 1
+                previous_state = row[6]
+            changes_list.append(changes)
+
+            with open(file + '.csv', 'w') as openfile:
+                openfile.write('Accuracy, Early Detection, Persistence\n')
+                openfile.write('%f, %f, %f\n'%(accuracy, early_predict, changes))
+
+    # Compute Accuracy mean/std
+    accuracy_array = np.array(accuracy_list)
+    acc_mean = np.mean(accuracy_array)
+    acc_std = np.std(accuracy_array)
+
+    # Compute Early Detection mean/std
+    early_predict_array = np.array(early_predict_list)
+    early_mean = np.mean(early_predict_array)
+    early_std = np.std(early_predict_array)
+
+    # Compute Persistence mean/std
+    changes_array = np.array(changes_list)
+    change_mean = np.mean(changes_array)
+    change_std = np.std(changes_array)
+
+    with open('all_data_analysis.csv', 'w') as openfile:
+        openfile.write('Type, Mean, Standard Deviation\n')
+        openfile.write('Accuracy, %f, %f\n'%(acc_mean, acc_std))
+        openfile.write('Early Detection, %f, %f\n'%(early_mean, early_std))
+        openfile.write('Persistence, %f, %f\n'%(change_mean, change_std))
+        openfile.write('\n')
+
+        openfile.write('LOG, Accuracy, Early Detection, Persistence\n')
+        for i in xrange(len(filename_list)):
+            openfile.write('%s, %f, %f, %f\n'%(filename_list[i], accuracy_list[i], early_predict_list[i], changes_list[i]))
+
 
 if __name__ == '__main__':
     main()
