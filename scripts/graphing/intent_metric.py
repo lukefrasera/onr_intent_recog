@@ -23,7 +23,7 @@ def main():
     args = parser.parse_args()
 
     if not os.path.exists(args.dir):
-        print "error Firectory doesn't exist"
+        print "error directory doesn't exist"
         return -1
     if os.path.isfile(args.dir):
         print "Error: Expected Directory not File"
@@ -31,6 +31,7 @@ def main():
 
     accuracy_list = []
     early_predict_list = []
+    early_predict_list_2 = []
     changes_list = []
     filename_list = []
     for dirname, subdirlist, fileList, in os.walk(args.dir):
@@ -61,7 +62,7 @@ def main():
             plt.plot(ram_data[:,0], ram_data[:,7], label='Ram', color='red', linewidth=2.0)
             plt.plot(herd_data[:,0], herd_data[:,7], label='Herd', color='green', linewidth=2.0)
             plt.title('Overlayed Predictions')
-            plt.ylim([0,1])
+            plt.ylim([-0.01,1.01])
             plt.legend(loc='upper right')
             plt.setp(g1.get_xticklabels(), visible=False)
             plt.gca().xaxis.set_major_formatter(formatter)
@@ -69,21 +70,21 @@ def main():
             g2 = plt.subplot(412)
             plt.plot(block_data[:,0], block_data[:,7], color='blue', linewidth=2.0)
             plt.title('Block Prediction')
-            plt.ylim([0,1])
+            plt.ylim([-0.01,1.01])
             plt.setp(g2.get_xticklabels(), visible=False)
             plt.gca().xaxis.set_major_formatter(formatter)
 
             g3 = plt.subplot(413)
             plt.plot(ram_data[:,0], ram_data[:,7], color='red', linewidth=2.0)
             plt.title('Ram Prediction')
-            plt.ylim([0,1])
+            plt.ylim([-0.01,1.01])
             plt.setp(g3.get_xticklabels(), visible=False)
             plt.gca().xaxis.set_major_formatter(formatter)
 
             g4 = plt.subplot(414)
             plt.plot(herd_data[:,0], herd_data[:,7], color='green', linewidth=2.0)
             plt.title('Herd Prediction')
-            plt.ylim([0,1])
+            plt.ylim([-0.01,1.01])
             plt.gca().xaxis.set_major_formatter(formatter)
 
             # plt.tight_layout()
@@ -167,9 +168,16 @@ def main():
             early_predict = 1
             for i in reversed(xrange(len(prediction))):
                 if prediction[i,6] != class_type:
-                    early_predict = float(len(prediction) - (i+1)) / float(num_predict)
+                    early_predict = float((i+1)) / float(num_predict)
                     break
             early_predict_list.append(early_predict)
+            # Compute Second early detection Rate
+            early_predict_2 = 1
+            for i in xrange(len(prediction)):
+                if prediction[i,6] == class_type:
+                    early_predict_2 = float(i) / float(num_predict)
+                    break
+            early_predict_list_2.append(early_predict_2)
             # compute Persistance of Recognized intent
             changes = -1
             previous_state = -1
@@ -180,8 +188,8 @@ def main():
             changes_list.append(changes)
 
             with open(file + '.csv', 'w') as openfile:
-                openfile.write('Accuracy, Early Detection, Persistence\n')
-                openfile.write('%f, %f, %f\n'%(accuracy, early_predict, changes))
+                openfile.write('Accuracy, Early Detection, First Detection, Persistence\n')
+                openfile.write('%f, %f, %f, %f\n'%(accuracy, early_predict, early_predict_2, changes))
 
     # Compute Accuracy mean/std
     accuracy_array = np.array(accuracy_list)
@@ -193,6 +201,11 @@ def main():
     early_mean = np.mean(early_predict_array)
     early_std = np.std(early_predict_array)
 
+    # Compute Early first detection
+    early_predict_array_2 = np.array(early_predict_list_2)
+    early_mean_2 = np.mean(early_predict_array_2)
+    early_std_2 = np.std(early_predict_array_2)
+
     # Compute Persistence mean/std
     changes_array = np.array(changes_list)
     change_mean = np.mean(changes_array)
@@ -202,12 +215,13 @@ def main():
         openfile.write('Type, Mean, Standard Deviation\n')
         openfile.write('Accuracy, %f, %f\n'%(acc_mean, acc_std))
         openfile.write('Early Detection, %f, %f\n'%(early_mean, early_std))
+        openfile.write('First Detection, %f, %f\n'%(early_mean_2, early_std_2))
         openfile.write('Persistence, %f, %f\n'%(change_mean, change_std))
         openfile.write('\n')
 
-        openfile.write('LOG, Accuracy, Early Detection, Persistence\n')
+        openfile.write('LOG, Accuracy, Early Detection, First Detection, Persistence\n')
         for i in xrange(len(filename_list)):
-            openfile.write('%s, %f, %f, %f\n'%(filename_list[i], accuracy_list[i], early_predict_list[i], changes_list[i]))
+            openfile.write('%s, %f, %f, %f, %f\n'%(filename_list[i], accuracy_list[i], early_predict_list[i], early_predict_list_2[i], changes_list[i]))
 
 
 if __name__ == '__main__':
