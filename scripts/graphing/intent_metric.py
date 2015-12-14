@@ -14,6 +14,10 @@ def scientificNotation(value):
         m = np.sign(value) * 10 ** (e - int(e))
         return r'${:.0f} \cdot 10^{{{:d}}}$'.format(m, int(e))
 
+def MillisecondToSecondNotation(value):
+    # print value
+    return r'$%d$'%(value)
+
 def main():
 
     # import data
@@ -40,6 +44,7 @@ def main():
             print "Processing: %s"%(filename)
             # graph predictions
             data = np.genfromtxt(filename, delimiter=',')[1:]
+            data[:,0] = np.divide(data[:,0] - 1001000, 1000000)
             block_data = data[data[:,6] == 5]
             ram_data   = data[data[:,6] == 1]
             herd_data  = data[data[:,6] == 7]
@@ -52,8 +57,8 @@ def main():
             file = os.path.basename(os.path.dirname(filename))
             filename_list.append(file)
             fig.suptitle("%s"%(file), fontsize=22)
-            formatter = mpl.ticker.FuncFormatter(lambda x, p: scientificNotation(x))
-            fig.text(0.5, 0.03, 'Time', ha='center', va='center', fontsize=14, fontweight='bold')
+            formatter = mpl.ticker.FuncFormatter(lambda x, p: MillisecondToSecondNotation(x))
+            fig.text(0.5, 0.03, 'Time(s)', ha='center', va='center', fontsize=14, fontweight='bold')
             fig.text(0.03, 0.5, 'Probability', ha='center', va='center', rotation='vertical', fontsize=14, fontweight='bold')
             plt.subplots_adjust(hspace=.2, left=.06, top=.90, right=0.97, bottom=0.07)
 
@@ -71,6 +76,7 @@ def main():
             plt.plot(block_data[:,0], block_data[:,7], color='blue', linewidth=2.0)
             plt.title('Block Prediction')
             plt.ylim([-0.01,1.01])
+            plt.xlim(left=0)
             plt.setp(g2.get_xticklabels(), visible=False)
             plt.gca().xaxis.set_major_formatter(formatter)
 
@@ -78,6 +84,7 @@ def main():
             plt.plot(ram_data[:,0], ram_data[:,7], color='red', linewidth=2.0)
             plt.title('Ram Prediction')
             plt.ylim([-0.01,1.01])
+            plt.xlim(left=0)
             plt.setp(g3.get_xticklabels(), visible=False)
             plt.gca().xaxis.set_major_formatter(formatter)
 
@@ -85,6 +92,7 @@ def main():
             plt.plot(herd_data[:,0], herd_data[:,7], color='green', linewidth=2.0)
             plt.title('Herd Prediction')
             plt.ylim([-0.01,1.01])
+            plt.xlim(left=0)
             plt.gca().xaxis.set_major_formatter(formatter)
 
             # plt.tight_layout()
