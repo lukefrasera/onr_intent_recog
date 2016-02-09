@@ -15,17 +15,8 @@ delta_location         = {'closer'            : 10, 'farther'      : 11, 'statio
 delta_speed            = {'accelerating'      : 20, 'decelerating' : 21, 'constant'   : 22}
 delta_angle            = {'turning-toward'    : 30, 'turning-away' : 31, 'constant'   : 32}
 delta_relative_heading = {'increasing'        : 40, 'decreasing'   : 41, 'constant'   : 42} 
-
-# Real rel angle
-# CPA
-# TIME
-# Check out 84 and 80
-
-#cpa_distance   = {'will-collide'      : 50, 'may-collide'  : 51, 'neither'    : 52}
-
-# TODO(alex) CPA distance may help with the confusion between benign and the others
-# UPDATE CPA distance does not seem to predict anything very well, CPA distacne 
-# fluctuates wildly with all intents, with no appreant pattern, need more research
+cpa_distance           = {'increasing'        : 50, 'decreasing'   : 51, 'constant'   : 52}
+cpa_time               = {'positive'          : 60, 'negative'     : 61, 'zero'       : 62}
 
 # CSV Feature Indices
 ownBoat_x         = 0
@@ -49,12 +40,16 @@ otherBoat_dTheta  = 15
 timeStamp         = 16
 contact_id        = 17
 
+cpa_dDist         = 18
+cpa_vTime         = 19
+
 # Thresholds
 relativeAngleThresh = (math.pi / 12)
 distanceThresh = 1.0
 accelThresh = 0.1
 deltaAngleThresh = 0.01
 relHeadThresh = 0.001
+cpaDistThresh = 0.01
 
 # Other controls
 dataLen = 20
@@ -168,7 +163,25 @@ def computeSymbols(inputFeatures):
         else:
             symbol.append(delta_relative_heading['decreasing'])
             
-        #TODO determine CPA
+        # determine CPA distance
+        cpaDist = getCpaDistanceDelta(feature)
+
+        if abs(cpaDist) < cpaDistThresh:
+            symbol.append(cpa_distance['constant'])
+        elif cpaDist < 0:
+            symbol.append(cpa_distance['decreasing'])
+        else:
+            symbol.append(cpa_distance['increasing'])
+
+        # determine CPA time
+        cpaTime = getCpaDistanceDelta(feature)
+
+        if abs(cpaTime) == 0.0:
+            symbol.append(cpa_time['zero'])
+        elif cpaDist < 0:
+            symbol.append(cpa_time['negative'])
+        else:
+            symbol.append(cpa_time['positive'])
 
         # add observed symbols to symbol list
         symbols.append(symbol)
@@ -262,18 +275,25 @@ def getRelativeHeading(feature):
 
     return current_angle - previous_angle
 
+def getCpaDistanceDelta(feature):
+    return float(feature[cpa_dDist])
+
+def getCpaTimeValue(feature):
+    return float(feature[cpa_vTime])
+
 def collapseObservations():
-
     collapsedObservations = dict()
-
     counter = 0
+
     for k1, v1 in relative_angle.iteritems():
         for k2, v2 in delta_location.iteritems():
             for k3, v3 in delta_speed.iteritems():
                 for k4, v4 in delta_angle.iteritems():
                     for k5, v5 in delta_relative_heading.iteritems():
-                        counter += 1
-                        collapsedObservations[str(v1)+str(v2)+str(v3)+str(v4)+str(v5)] = counter
+                        for k6, v6 in cpa_distance.iteritems():
+                            for k7, v7 in cpa_time.iteritems():
+                                counter += 1
+                                collapsedObservations[str(v1)+str(v2)+str(v3)+str(v4)+str(v5)+str(v6)+str(v7)] = counter
 
     return collapsedObservations
 
@@ -309,7 +329,7 @@ def train(inputFileDir, outputFileName, numStates):
 
         # Convert list of symbols to unique interger identifier
         for s in observedSymbols:
-            observed_fixed.append(collapsedObservations[str(s[0])+str(s[1])+str(s[2])+str(s[3])+str(s[4])])
+            observed_fixed.append(collapsedObservations[str(s[0])+str(s[1])+str(s[2])+str(s[3])+str(s[4])+str(s[5])+str(s[6])])
 
         # Bin data
         split = binData(observed_fixed)
@@ -385,7 +405,7 @@ def test(inputFileDir):
 
         # Convert list of symbols to unique interger identifier
         for s in observedSymbols:
-            observed_fixed.append(collapsedObservations[str(s[0])+str(s[1])+str(s[2])+str(s[3])+str(s[4])])
+            observed_fixed.append(collapsedObservations[str(s[0])+str(s[1])+str(s[2])+str(s[3])+str(s[4])+str(s[5])+str(s[6])])
 
         # Bin data
         split = binData(observed_fixed)
