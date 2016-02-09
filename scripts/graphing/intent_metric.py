@@ -14,6 +14,10 @@ def scientificNotation(value):
         m = np.sign(value) * 10 ** (e - int(e))
         return r'${:.0f} \cdot 10^{{{:d}}}$'.format(m, int(e))
 
+def MillisecondToSecondNotation(value):
+    # print value
+    return r'$%d$'%(value)
+
 def main():
 
     # import data
@@ -40,9 +44,12 @@ def main():
             print "Processing: %s"%(filename)
             # graph predictions
             data = np.genfromtxt(filename, delimiter=',')[1:]
+            data[:,0] = np.divide(data[:,0] - 1001000, 1000000)
             block_data = data[data[:,6] == 5]
             ram_data   = data[data[:,6] == 1]
             herd_data  = data[data[:,6] == 7]
+            benign_data= data[data[:,6] == 3]
+
             '''
             plot a 4 sublpot graph with one combined graph and 3 of the individual
             probabilities to understand meaning easier
@@ -52,8 +59,8 @@ def main():
             file = os.path.basename(os.path.dirname(filename))
             filename_list.append(file)
             fig.suptitle("%s"%(file), fontsize=22)
-            formatter = mpl.ticker.FuncFormatter(lambda x, p: scientificNotation(x))
-            fig.text(0.5, 0.03, 'Time', ha='center', va='center', fontsize=14, fontweight='bold')
+            formatter = mpl.ticker.FuncFormatter(lambda x, p: MillisecondToSecondNotation(x))
+            fig.text(0.5, 0.03, 'Time(s)', ha='center', va='center', fontsize=14, fontweight='bold')
             fig.text(0.03, 0.5, 'Probability', ha='center', va='center', rotation='vertical', fontsize=14, fontweight='bold')
             plt.subplots_adjust(hspace=.2, left=.06, top=.90, right=0.97, bottom=0.07)
 
@@ -67,24 +74,35 @@ def main():
             # plt.setp(g1.get_xticklabels(), visible=False)
             # plt.gca().xaxis.set_major_formatter(formatter)
 
-            g2 = plt.subplot(311)
+            g2 = plt.subplot(411)
             plt.plot(block_data[:,0], block_data[:,7], color='blue', linewidth=2.0)
             plt.title('Block Prediction')
             plt.ylim([-0.01,1.01])
+            plt.xlim(left=0)
             plt.setp(g2.get_xticklabels(), visible=False)
             plt.gca().xaxis.set_major_formatter(formatter)
 
-            g3 = plt.subplot(312)
+            g2 = plt.subplot(412)
+            plt.plot(benign_data[:,0], benign_data[:,7], color='orange', linewidth=2.0)
+            plt.title('Benign Prediction')
+            plt.ylim([-0.01,1.01])
+            plt.xlim(left=0)
+            plt.setp(g2.get_xticklabels(), visible=False)
+            plt.gca().xaxis.set_major_formatter(formatter)
+
+            g3 = plt.subplot(413)
             plt.plot(ram_data[:,0], ram_data[:,7], color='red', linewidth=2.0)
             plt.title('Ram Prediction')
             plt.ylim([-0.01,1.01])
+            plt.xlim(left=0)
             plt.setp(g3.get_xticklabels(), visible=False)
             plt.gca().xaxis.set_major_formatter(formatter)
 
-            g4 = plt.subplot(313)
+            g4 = plt.subplot(414)
             plt.plot(herd_data[:,0], herd_data[:,7], color='green', linewidth=2.0)
             plt.title('Herd Prediction')
             plt.ylim([-0.01,1.01])
+            plt.xlim(left=0)
             plt.gca().xaxis.set_major_formatter(formatter)
 
             # plt.tight_layout()
@@ -105,18 +123,23 @@ def main():
             elif 'herd' in file.lower():
                 # print "Herd Type"
                 class_type = 7
+            elif 'benign' in file.lower():
+                class_type = 3
             else:
                 print "Error: Type not detected"
             prediction = []
 
             for i in xrange(len(block_data)):
-                m = max(block_data[i, 7], ram_data[i, 7], herd_data[i,7])
-                if m == block_data[i, 7]:
-                    prediction.append(block_data[i])
-                elif m == ram_data[i, 7]:
-                    prediction.append(ram_data[i])
-                elif m == herd_data[i, 7]:
-                    prediction.append(herd_data[i])
+                m = max(block_data[i, 7], ram_data[i, 7], herd_data[i,7], benign_data[i,7])
+                if m != 0:
+                    if m == block_data[i, 7]:
+                        prediction.append(block_data[i])
+                    elif m == ram_data[i, 7]:
+                        prediction.append(ram_data[i])
+                    elif m == herd_data[i, 7]:
+                        prediction.append(herd_data[i])
+                    elif m == benign_data[i, 7]:
+                        prediction.append(benign_data[i])
             prediction = np.array(prediction)
             # Compute Accuracy
             # block_num = len([prediction[i] for i in xrange(len(prediction)) if prediction[i,4] == 5])
@@ -126,19 +149,19 @@ def main():
             num_predict = len(prediction)
             accuracy = float(num_correct) / float(num_predict)
             accuracy_list.append(accuracy)
-
             # Compute confusion matrix
             ground_truth = [class_type for i in xrange(len(prediction))]
-            class_types = [1,5,7]
+            class_types = [1,5,7,3]
 
-            confusion_mat = np.zeros([3,3])
+            confusion_mat = np.zeros([len(class_types),len(class_types)])
             for i, correct_index in enumerate(class_types):
                 for j, predicted_index in enumerate(class_types):
                     for k in xrange(len(prediction)):
                         if prediction[k,6] == predicted_index and ground_truth[k] == correct_index:
                             confusion_mat[i, j] += 1.0
             for i, row in enumerate(confusion_mat):
-                confusion_mat[i] = row / sum(row, 1)
+                if sum(row) != 0:
+                    confusion_mat[i] = row / sum(row)
 
             fig_conf = plt.figure(2)
 
@@ -153,7 +176,7 @@ def main():
                     ax.annotate(str(confusion_mat[y,x]), xy=(x,y),horizontalalignment='center',verticalalignment='center')
 
             cb = fig_conf.colorbar(res)
-            class_list = ['RAM', 'BLOCK', 'HERD']
+            class_list = ['RAM', 'BLOCK', 'HERD', 'BENIGN']
             plt.xticks(range(len(class_list)), class_list)
             plt.yticks(range(len(class_list)), class_list)
             plt.ylabel('True label')
