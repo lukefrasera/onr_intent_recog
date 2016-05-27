@@ -173,7 +173,7 @@ def main():
             ax.set_aspect(1)
             rows = len(confusion_mat)
             cols = len(confusion_mat[0])
-            res = ax.imshow(confusion_mat, cmap=plt.cm.jet, interpolation='nearest')
+            res = ax.imshow(confusion_mat, cmap=plt.cm.viridis, interpolation='nearest')
 
             for x in xrange(cols):
                 for y in xrange(rows):
