@@ -1,6 +1,7 @@
 import sys
 import os
 import math
+import random
 import argparse
 import csv
 import pickle
@@ -56,7 +57,7 @@ cpaDeltaDistThresh = 0.01
 cpaDistanceThresh = 200.0
 
 # Other controls
-dataLen = 20
+dataLen = 20 # this is the length of our input features in 'hmm_formatted.csv'
 
 # Testing HMM names
 ramHMM    = 'hmm_ram'
@@ -78,7 +79,7 @@ def getFilesFromDir(topLevelDir):
 
     fileList = []
 
-    # In case the input dir as a tailing '/' on it
+    # In case the input dir has a tailing '/' on it
     if topLevelDir[-1] != '/':
         topLevelDir = topLevelDir + '/'
 
@@ -113,6 +114,8 @@ def readInputFile(inputFileName):
     return computeSymbols(inputFeatures), inputFeatures
 
 # Compute Symbols from Features
+# This is the function where we take our continuous features
+# and turn them into discrete values
 def computeSymbols(inputFeatures):
     
     symbols = []
@@ -198,8 +201,13 @@ def computeSymbols(inputFeatures):
 
     return symbols
 
+# this function does some trig to determine the relative angle
+# I did this manually, but I later remembered that this info is already
+# in the input data (which I think I stripped out in the preprocessor)
+# As a TODO we could strip this calculation out and just get the value
+# from the input data
 def getRelativeAngle(feature):
-    
+
     # get 'heading' angle
     heading = math.atan2(feature[otherBoat_vy], feature[otherBoat_vx])
     prev_heading = math.atan2(feature[otherBoat_vy] - feature[otherBoat_ay], feature[otherBoat_vx] - feature[otherBoat_ax])
@@ -295,8 +303,8 @@ def collapseObservations():
     collapsedObservations = dict()
     counter = 0
 
-    # TODO: This has gotten out of hand
-    # make this a function
+    # TODO: This has gotten way out of hand
+    # make this a function or something
     for k1, v1 in relative_angle.iteritems():
         for k2, v2 in delta_location.iteritems():
             for k3, v3 in delta_speed.iteritems():
@@ -324,20 +332,25 @@ def train(inputFileDir, outputFileName, numStates):
         allPossibleSymbols.append(v)
 
     # Initialize HMM
-    #TODO try different parameters
+    #TODO try different parameters and different HMM models
+    # like discrete instead of Guassian
     HMM = hmm.GaussianHMM(n_components=numStates, n_iter=1000)
 
     # Get file names from training directory
     filenames = getFilesFromDir(inputFileDir)
+
+    #TODO(alex): determine if this is needed to circumvent transmut error?
+    #NOTE the error in question will occasionally occur when training, the hmm
+    #library will throw an error about the transmut matrix not summing to 1.0
+    #chaning the order of the traning files seems to help get around this, so
+    #that's what we're doing here
+    random.shuffle(filenames)
 
     # iterate over all of our training files
     for f in filenames:
 
         # Debug print statment
         print "Training with file: ", f
-
-        #if '69' in f:
-        #    raw_input()
 
         # More iterations here
         observed_fixed = []
@@ -350,12 +363,7 @@ def train(inputFileDir, outputFileName, numStates):
         # Bin data
         split = binData(observed_fixed)
 
-        # Debug print for all observed sequences
-        #for s in split:
-        #    print s
-        
-
-        # Update HMM
+        # Update HMM with new data from the current training file
         HMM.fit(split)
 
     # Test for good HMM
@@ -372,6 +380,7 @@ def binData(observed_symbols):
     split = []
 
     # Bin data in "Rolling Window" method
+    # talk to Monica if you don't understand this concept
     for i in range(dataLen, len(observed_symbols)):
         split.append(observed_symbols[(i - dataLen): i])
 
@@ -488,7 +497,12 @@ def createOutputReport(filename, probs, symbols):
                     if intent_index == '8':
                         intent_probability = '1' # we consider this special case 'unknown'
 
-                    f.write(originalCSV[originalIndex][1] + ",1,99,99,0,99," + intent_index + ',' + intent_probability + ",0\n")
+                    if len(originalCSV[originalIndex]) != 1:
+                        f.write(originalCSV[originalIndex][1] + ",1,99,99,0,99," + intent_index + ',' + intent_probability + ",0\n")
+
+                # Check for that pesky last line
+                if len(originalCSV[originalIndex]):
+                    break
 
                 originalIndex += 1
 

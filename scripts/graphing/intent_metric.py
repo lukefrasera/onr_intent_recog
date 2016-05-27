@@ -20,6 +20,8 @@ def MillisecondToSecondNotation(value):
 
 def main():
 
+    fnameToSkip = []
+
     # import data
     parser = argparse.ArgumentParser(description='Process Input')
     parser.add_argument('-d', '--dir', type=str, required=True, help='Directory Of Probability CSV files')
@@ -147,6 +149,8 @@ def main():
             # herd_num = len([prediction[i] for i in xrange(len(prediction)) if prediction[i,4] == 7])
             num_correct = len([prediction[i] for i in xrange(len(prediction)) if prediction[i,6] == class_type])
             num_predict = len(prediction)
+
+
             accuracy = float(num_correct) / float(num_predict)
             accuracy_list.append(accuracy)
             # Compute confusion matrix
@@ -173,7 +177,7 @@ def main():
 
             for x in xrange(cols):
                 for y in xrange(rows):
-                    ax.annotate(str(confusion_mat[y,x]), xy=(x,y),horizontalalignment='center',verticalalignment='center')
+                    ax.annotate(str('{0:.2f}'.format(confusion_mat[y,x])), xy=(x,y),horizontalalignment='center',verticalalignment='center')
 
             cb = fig_conf.colorbar(res)
             class_list = ['RAM', 'BLOCK', 'HERD', 'BENIGN']
@@ -183,6 +187,7 @@ def main():
             plt.xlabel('Predicted label')
             plt.title('%s Confusion Matrix'%(file))
             plt.savefig(file + '_confusion.pdf')
+
             if args.verbose:
                 plt.show()
             fig_conf.clear()
@@ -244,6 +249,10 @@ def main():
 
         openfile.write('LOG, Accuracy, Early Detection, First Detection, Persistence\n')
         for i in xrange(len(filename_list)):
+
+            if filename_list[i] in fnameToSkip:
+                continue
+
             openfile.write('%s, %f, %f, %f, %f\n'%(filename_list[i], accuracy_list[i], early_predict_list[i], early_predict_list_2[i], changes_list[i]))
 
 
